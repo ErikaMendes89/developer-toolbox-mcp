@@ -1,0 +1,14 @@
+FROM python:3.12-slim
+
+RUN useradd --create-home --uid 10001 toolbox
+WORKDIR /app
+
+COPY pyproject.toml README.md ./
+COPY src ./src
+RUN pip install --no-cache-dir .
+
+USER toolbox
+ENV TOOLBOX_WORKSPACE_ROOT=/workspace
+VOLUME ["/workspace"]
+
+ENTRYPOINT ["developer-toolbox-mcp"]

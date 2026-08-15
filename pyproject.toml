@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "developer-toolbox-mcp"
+version = "0.1.0"
+description = "A security-conscious MCP developer toolbox built as a practical software engineering study project."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Erika Mendes" }]
+dependencies = [
+  "mcp>=1.0,<2.0",
+  "pydantic>=2.7,<3.0",
+  "pydantic-settings>=2.2,<3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0,<9.0",
+  "pytest-cov>=5.0,<7.0",
+  "ruff>=0.6,<1.0",
+]
+
+[project.scripts]
+developer-toolbox-mcp = "developer_toolbox_mcp.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/developer_toolbox_mcp"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
