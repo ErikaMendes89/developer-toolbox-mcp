@@ -1,58 +1,58 @@
-# Architecture
+# Arquitetura
 
-## Purpose
+## Objetivo
 
-Developer Toolbox MCP is intentionally small in its first release. The goal is to learn MCP by implementing a real server while keeping the security boundary understandable enough to audit.
+O Developer Toolbox MCP é intencionalmente pequeno em sua primeira versão. O objetivo é estudar MCP por meio da implementação de um servidor real, mantendo a fronteira de segurança simples o suficiente para ser compreendida, revisada e auditada.
 
-## Component view
+## Visão de componentes
 
 ```mermaid
 flowchart LR
-    Client[MCP Client] -->|stdio / MCP| Server[FastMCP Server]
-    Server --> Tools[Tool Registry]
-    Tools --> Guard[Security Boundary]
-    Guard --> FS[Workspace Files]
-    Guard --> Git[Read-only Git]
-    Config[Environment Configuration] --> Guard
+    Client[Cliente MCP] -->|stdio / MCP| Server[Servidor FastMCP]
+    Server --> Tools[Registro de Tools]
+    Tools --> Guard[Camada de Segurança]
+    Guard --> FS[Arquivos do Workspace]
+    Guard --> Git[Git somente leitura]
+    Config[Configuração por Ambiente] --> Guard
 ```
 
-## Request flow
+## Fluxo de uma requisição
 
-1. An MCP client discovers a tool exposed by the server.
-2. FastMCP validates and dispatches the tool call.
-3. Filesystem inputs are resolved against one configured workspace root.
-4. Security checks reject traversal, credential-like files, oversized files, and unsupported binary content.
-5. Git tools execute a fixed command and argument list with `shell=False` semantics through `subprocess.run`.
-6. A bounded result is returned to the MCP client.
+1. Um cliente MCP descobre uma tool exposta pelo servidor.
+2. O FastMCP valida e encaminha a chamada da tool.
+3. Entradas relacionadas ao filesystem são resolvidas a partir de uma única raiz de workspace configurada.
+4. As validações de segurança bloqueiam path traversal, arquivos com aparência de credenciais, arquivos grandes demais e conteúdo binário não suportado.
+5. As tools de Git executam comandos e argumentos fixos com semântica `shell=False` por meio de `subprocess.run`.
+6. Um resultado limitado é devolvido ao cliente MCP.
 
-## Security model
+## Modelo de segurança
 
-The initial version assumes the MCP client itself may send untrusted arguments. Therefore trust is not delegated to the model.
+A versão inicial assume que o próprio cliente MCP pode enviar argumentos não confiáveis. Portanto, a confiança não é delegada ao modelo de IA.
 
-Controls implemented in v0.1:
+Controles implementados na v0.1:
 
-- workspace root confinement;
-- path traversal prevention using resolved paths;
-- secret/credential filename blocking;
-- maximum file size;
-- bounded search results;
-- bounded Git history;
-- fixed read-only Git operations;
-- subprocess execution without a shell;
-- subprocess timeout;
-- Docker execution as an unprivileged user;
-- no database or network credentials required.
+- confinamento ao diretório raiz do workspace;
+- prevenção de path traversal utilizando caminhos resolvidos;
+- bloqueio de nomes de arquivos associados a segredos ou credenciais;
+- limite máximo de tamanho de arquivo;
+- quantidade limitada de resultados de busca;
+- histórico Git limitado;
+- operações Git fixas e somente leitura;
+- execução de subprocessos sem shell;
+- timeout de subprocessos;
+- execução do container Docker com usuário sem privilégios;
+- nenhuma credencial de banco de dados ou rede exigida.
 
-This is defense in depth, not a claim that the project is production-hardened.
+Essa estratégia aplica defesa em profundidade, mas não representa uma afirmação de que o projeto já esteja endurecido para produção.
 
-## Why stdio first?
+## Por que começar com stdio?
 
-stdio keeps the first implementation local and avoids prematurely introducing HTTP authentication, exposed ports, TLS, CORS, and remote multi-user authorization. A network transport can be studied later with an explicit threat model.
+O uso de `stdio` mantém a primeira implementação local e evita introduzir cedo demais autenticação HTTP, portas expostas, TLS, CORS e autorização remota multiusuário. Um transporte em rede poderá ser estudado posteriormente, acompanhado de um modelo de ameaças explícito.
 
-## Planned evolution
+## Evolução planejada
 
-- v0.2: richer Git and code-navigation tools;
-- v0.3: PostgreSQL read-only adapter with explicit allowlists;
-- v0.4: semantic documentation search / RAG;
-- v0.5: structured logs, metrics, traces and OpenTelemetry;
-- v1.0: authentication/policy layer for remote deployment experiments.
+- **v0.2:** ferramentas mais completas de Git e navegação de código;
+- **v0.3:** adapter PostgreSQL somente leitura com allowlists explícitas;
+- **v0.4:** busca semântica em documentação / RAG;
+- **v0.5:** logs estruturados, métricas, traces e OpenTelemetry;
+- **v1.0:** camada de autenticação e policies para experimentos de execução remota.
