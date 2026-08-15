@@ -1,91 +1,91 @@
 # Developer Toolbox MCP
 
-A security-conscious **Model Context Protocol (MCP)** server written in Python that gives compatible AI clients a small set of developer tools for inspecting a local codebase.
+Um servidor **Model Context Protocol (MCP)** desenvolvido em Python, com foco em segurança, que oferece a clientes de IA compatíveis um conjunto de ferramentas para inspecionar uma base de código local.
 
-The project is deliberately being built as a **practical software-engineering study project**. Its purpose is not only to produce a working MCP server, but to document how MCP works, why architectural decisions were made, which security boundaries are necessary when an LLM can request tool execution, and how the implementation evolves from a small local server toward a more observable and production-oriented architecture.
+Este projeto está sendo desenvolvido deliberadamente como uma **parte prática de estudo em Engenharia de Software, IA aplicada e MCP**. O objetivo não é apenas criar um servidor MCP funcional, mas também documentar como o protocolo funciona, por que determinadas decisões arquiteturais foram tomadas, quais limites de segurança são necessários quando um LLM pode solicitar a execução de ferramentas e como a implementação pode evoluir de um servidor local pequeno para uma arquitetura mais observável e próxima de um cenário de produção.
 
-## Why this project exists
+## Por que este projeto existe?
 
-Reading about MCP explains the protocol; implementing an MCP server exposes the engineering problems around it: tool contracts, trust boundaries, filesystem access, subprocess execution, input validation, transport choices, testing, packaging and observability.
+Ler sobre MCP ajuda a entender o protocolo. Implementar um servidor MCP, porém, expõe problemas reais de engenharia: contratos de ferramentas, fronteiras de confiança, acesso ao sistema de arquivos, execução de subprocessos, validação de entrada, escolha de transporte, testes, empacotamento e observabilidade.
 
-This repository therefore acts as both:
+Por isso, este repositório funciona ao mesmo tempo como:
 
-1. a working developer toolbox; and
-2. a public engineering notebook demonstrating the practical application of MCP concepts.
+1. uma toolbox funcional para desenvolvimento; e
+2. um registro público de estudo de engenharia, mostrando a aplicação prática dos conceitos de MCP.
 
-The implementation is intentionally incremental. New capabilities should come with an explanation of the design decision and, where appropriate, tests and security controls.
+A implementação é propositalmente incremental. Novas funcionalidades devem vir acompanhadas da justificativa da decisão de projeto e, quando aplicável, de testes e controles de segurança.
 
-## What is MCP?
+## O que é MCP?
 
-The Model Context Protocol is an open protocol that standardizes how AI applications can connect to external tools and contextual data. An MCP server exposes capabilities through defined protocol primitives; an MCP client can discover and invoke those capabilities without each integration requiring a completely bespoke interface.
+O **Model Context Protocol** é um protocolo aberto que padroniza a forma como aplicações de IA se conectam a ferramentas externas e fontes de contexto. Um servidor MCP expõe capacidades por meio de primitivas definidas pelo protocolo; um cliente MCP pode descobrir e invocar essas capacidades sem que cada integração precise implementar uma interface totalmente proprietária.
 
-This project uses the Python MCP SDK and its `FastMCP` server API.
+Este projeto utiliza o SDK MCP para Python e a API de servidor `FastMCP`.
 
-## Current capabilities — v0.1
+## Funcionalidades atuais — v0.1
 
-| Tool | Purpose | Safety boundary |
+| Tool | Finalidade | Limite de segurança |
 | --- | --- | --- |
-| `health_check` | Reports basic service health | Does not expose host details |
-| `list_repo_files` | Lists files/directories | Confined to configured workspace |
-| `read_file` | Reads UTF-8 source/text files | Size limit + credential blocking |
-| `search_code` | Literal case-insensitive code search | Bounded results + workspace confinement |
-| `git_status` | Reads Git working-tree status | Fixed read-only Git command |
-| `git_log` | Reads compact commit history | Fixed command + bounded history |
+| `health_check` | Informa o estado básico do serviço | Não expõe detalhes desnecessários do host |
+| `list_repo_files` | Lista arquivos e diretórios | Restrito ao workspace configurado |
+| `read_file` | Lê arquivos de texto/código em UTF-8 | Limite de tamanho + bloqueio de credenciais |
+| `search_code` | Busca literal case-insensitive no código | Quantidade de resultados limitada + confinamento ao workspace |
+| `git_status` | Consulta o estado da working tree do Git | Comando Git fixo e somente leitura |
+| `git_log` | Consulta um histórico compacto de commits | Comando fixo + histórico limitado |
 
-There are deliberately **no arbitrary shell-command tools** in this release.
+Nesta versão, deliberadamente **não existe uma ferramenta para executar comandos arbitrários de shell**.
 
-## Architecture
+## Arquitetura
 
 ```mermaid
 flowchart LR
-    Client[Claude / Cursor / other MCP client]
-    Client -->|MCP over stdio| Server[Developer Toolbox MCP]
-    Server --> Registry[FastMCP Tool Registry]
-    Registry --> Guard[Security Boundary]
-    Guard --> Files[Workspace Files]
-    Guard --> Git[Read-only Git]
-    Config[Environment Configuration] --> Guard
+    Client[Claude / Cursor / outro cliente MCP]
+    Client -->|MCP via stdio| Server[Developer Toolbox MCP]
+    Server --> Registry[Registro de Tools FastMCP]
+    Registry --> Guard[Camada de Segurança]
+    Guard --> Files[Arquivos do Workspace]
+    Guard --> Git[Git somente leitura]
+    Config[Configuração por Ambiente] --> Guard
 ```
 
-The first version uses `stdio`. Keeping the server local avoids introducing remote authentication, exposed ports and multi-user authorization before those concerns can be modeled properly.
+A primeira versão utiliza `stdio`. Manter o servidor local evita introduzir precocemente autenticação remota, portas expostas e autorização multiusuário antes que essas preocupações sejam modeladas corretamente.
 
-See [`docs/architecture.md`](docs/architecture.md) for the component model, request flow, threat assumptions and roadmap.
+Veja [`docs/architecture.md`](docs/architecture.md) para o modelo de componentes, fluxo das requisições, premissas de segurança e roadmap.
 
-## How it was built
+## Como o projeto foi construído
 
-The implementation was split into a few explicit responsibilities rather than putting every tool directly into one script:
+A implementação foi separada em responsabilidades explícitas, em vez de concentrar todas as ferramentas em um único script:
 
-- **`server.py`** defines the MCP server and the public tool contracts.
-- **`security.py`** owns filesystem validation and security boundaries.
-- **`config.py`** loads bounded runtime configuration from environment variables.
-- **tests** exercise security-sensitive behavior independently of an AI client.
-- **Docker** provides a reproducible execution path and runs as a non-root user.
-- **GitHub Actions** runs linting and tests across supported Python versions.
+- **`server.py`** define o servidor MCP e os contratos públicos das tools.
+- **`security.py`** concentra validações de filesystem e limites de segurança.
+- **`config.py`** carrega configurações de execução por variáveis de ambiente usando limites definidos.
+- **testes** validam comportamentos sensíveis à segurança sem depender de um cliente de IA.
+- **Docker** fornece uma forma reproduzível de execução e utiliza usuário não-root.
+- **GitHub Actions** executa lint e testes nas versões de Python suportadas.
 
-An important design decision was to treat tool arguments as **untrusted input**. The fact that an argument comes from an LLM does not make it safe. For example, `read_file("../../.ssh/id_rsa")` must be rejected by the server itself rather than relying on the model to avoid requesting it.
+Uma decisão importante foi tratar os argumentos recebidos pelas tools como **entrada não confiável**. O fato de um argumento ter sido produzido por um LLM não o torna seguro. Por exemplo, `read_file("../../.ssh/id_rsa")` deve ser bloqueado pelo próprio servidor, sem depender do modelo para evitar esse tipo de solicitação.
 
-For Git integration, the server does not expose a generic command executor. It builds a fixed `git` argument list and invokes it without shell interpolation. That keeps the v0.1 Git surface read-only and substantially smaller.
+Na integração com Git, o servidor não disponibiliza um executor genérico de comandos. Ele monta uma lista fixa de argumentos do `git` e executa o processo sem interpolação via shell. Dessa forma, a superfície de ataque da v0.1 permanece menor e as operações Git continuam somente leitura.
 
-## Security decisions
+## Decisões de segurança
 
-This is a study implementation, **not a claim of production hardening**. Nevertheless, security is part of the exercise rather than an afterthought.
+Este é um projeto de estudo e **não deve ser interpretado como um sistema já endurecido para produção**. Mesmo assim, segurança faz parte do exercício desde o início e não é tratada como detalhe posterior.
 
-Current controls include:
+Controles atuais:
 
-- canonical workspace-root confinement;
-- path traversal prevention;
-- `.env`, private-key and certificate-file blocking;
-- maximum readable file size;
-- bounded search and Git-log results;
-- no arbitrary shell tool;
-- subprocess timeout;
-- fixed read-only Git operations;
-- Docker process running without root privileges;
-- no database credentials or external secrets required for v0.1.
+- confinamento ao diretório raiz do workspace;
+- prevenção de path traversal;
+- bloqueio de `.env`, chaves privadas e arquivos de certificado;
+- limite máximo para leitura de arquivos;
+- limites para resultados de busca e histórico Git;
+- ausência de execução arbitrária de shell;
+- timeout para subprocessos;
+- operações Git fixas e somente leitura;
+- processo Docker executado sem privilégios de root;
+- nenhuma credencial de banco ou segredo externo necessário na v0.1.
 
-These controls also provide concrete examples of **least privilege**, **input validation**, **attack-surface reduction**, and **defense in depth**.
+Essas decisões servem como exemplos práticos de **princípio do menor privilégio**, **validação de entrada**, **redução da superfície de ataque** e **defesa em profundidade**.
 
-## Project structure
+## Estrutura do projeto
 
 ```text
 developer-toolbox-mcp/
@@ -107,23 +107,23 @@ developer-toolbox-mcp/
 └── README.md
 ```
 
-## Running locally
+## Executando localmente
 
-### Requirements
+### Requisitos
 
 - Python 3.11+
 - Git
 
-### 1. Clone
+### 1. Clonar o repositório
 
 ```bash
 git clone https://github.com/ErikaMendes89/developer-toolbox-mcp.git
 cd developer-toolbox-mcp
 ```
 
-When testing the implementation before it reaches `main`, checkout the implementation branch shown in the pull request.
+Enquanto a implementação ainda não estiver na `main`, faça checkout da branch apresentada no Pull Request.
 
-### 2. Create a virtual environment
+### 2. Criar um ambiente virtual
 
 Linux/macOS:
 
@@ -139,121 +139,121 @@ py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-### 3. Install
+### 3. Instalar as dependências
 
 ```bash
 python -m pip install --upgrade pip
 pip install -e '.[dev]'
 ```
 
-### 4. Configure the workspace
+### 4. Configurar o workspace
 
 ```bash
 cp .env.example .env
 ```
 
-The important setting is:
+A configuração principal é:
 
 ```dotenv
 TOOLBOX_WORKSPACE_ROOT=.
 ```
 
-Only files below that directory are eligible for filesystem tools. To experiment on another repository, point this value to that repository instead of broadening it to your entire home directory.
+Somente arquivos abaixo desse diretório podem ser acessados pelas tools de filesystem. Para experimentar em outro repositório, aponte essa variável especificamente para ele em vez de liberar todo o seu diretório pessoal.
 
-### 5. Run tests and lint
+### 5. Executar testes e lint
 
 ```bash
 ruff check .
 pytest --cov=developer_toolbox_mcp --cov-report=term-missing
 ```
 
-### 6. Start the MCP server
+### 6. Iniciar o servidor MCP
 
 ```bash
 developer-toolbox-mcp
 ```
 
-The process waits for an MCP client over standard input/output. It is normal for it not to behave like a conventional interactive CLI.
+O processo ficará aguardando a comunicação de um cliente MCP por entrada/saída padrão. Portanto, é normal que ele não se comporte como uma CLI interativa convencional.
 
-## Example MCP client configuration
+## Exemplo de configuração de um cliente MCP
 
-After installing the project in its virtual environment, configure a compatible client to launch the server executable. Paths must be absolute and adapted to your machine.
+Depois de instalar o projeto no ambiente virtual, configure um cliente compatível para iniciar o executável do servidor. Os caminhos devem ser absolutos e adaptados à sua máquina.
 
 ```json
 {
   "mcpServers": {
     "developer-toolbox": {
-      "command": "/absolute/path/developer-toolbox-mcp/.venv/bin/developer-toolbox-mcp",
+      "command": "/caminho/absoluto/developer-toolbox-mcp/.venv/bin/developer-toolbox-mcp",
       "env": {
-        "TOOLBOX_WORKSPACE_ROOT": "/absolute/path/to/repository-to-inspect"
+        "TOOLBOX_WORKSPACE_ROOT": "/caminho/absoluto/do/repositorio-a-inspecionar"
       }
     }
   }
 }
 ```
 
-Client configuration formats can differ, so consult the documentation for the specific MCP client you are testing.
+O formato de configuração pode variar entre clientes MCP. Consulte a documentação do cliente específico usado nos testes.
 
 ## Docker
 
-Build:
+Build da imagem:
 
 ```bash
 docker build -t developer-toolbox-mcp .
 ```
 
-The image runs as an unprivileged user and expects the inspected workspace at `/workspace`.
+A imagem executa com um usuário sem privilégios e espera que o workspace analisado esteja montado em `/workspace`.
 
-For a read-only experiment:
+Exemplo de execução com volume somente leitura:
 
 ```bash
 docker run --rm -i -v "$PWD:/workspace:ro" developer-toolbox-mcp
 ```
 
-## What I am studying through this repository
+## O que estou estudando com este repositório
 
-The practical topics covered by the project include:
+Os principais tópicos práticos abordados são:
 
-- MCP client/server architecture;
-- tool discovery and invocation;
-- Python packaging;
-- typed configuration with Pydantic;
-- secure filesystem boundaries;
-- subprocess isolation;
-- threat modeling for AI tool execution;
-- automated testing;
-- CI with GitHub Actions;
-- container hardening;
-- observability and RAG in later iterations.
+- arquitetura cliente/servidor do MCP;
+- descoberta e invocação de tools;
+- empacotamento de aplicações Python;
+- configuração tipada com Pydantic;
+- fronteiras seguras de acesso ao filesystem;
+- isolamento de subprocessos;
+- threat modeling aplicado à execução de ferramentas por IA;
+- testes automatizados;
+- CI com GitHub Actions;
+- hardening de containers;
+- observabilidade e RAG nas próximas versões.
 
 ## Roadmap
 
-### v0.2 — Developer ergonomics
+### v0.2 — Experiência de desenvolvimento
 
-Richer code navigation and safe Git inspection.
+Navegação de código mais rica e inspeção segura do Git.
 
-### v0.3 — Data access
+### v0.3 — Acesso a dados
 
-A PostgreSQL adapter designed around a read-only database role, query validation, timeouts and explicit allowlists.
+Adapter PostgreSQL utilizando usuário de banco somente leitura, validação de queries, timeouts e allowlists explícitas.
 
 ### v0.4 — RAG
 
-Semantic documentation search using embeddings and a vector store, with attention to retrieval quality and evaluation rather than adding RAG only as a feature label.
+Busca semântica em documentação utilizando embeddings e banco vetorial, incluindo preocupação com qualidade de recuperação e avaliação — não apenas adicionando RAG como um rótulo de feature.
 
-### v0.5 — Observability
+### v0.5 — Observabilidade
 
-Structured logs, metrics and distributed traces with OpenTelemetry.
+Logs estruturados, métricas e traces distribuídos com OpenTelemetry.
 
-### v1.0 — Remote-security study
+### v1.0 — Estudo de segurança para execução remota
 
-Experiment with a network transport, authentication, authorization/policies and a more formal threat model.
+Experimentos com transporte em rede, autenticação, autorização/policies e um modelo de ameaças mais formal.
 
-## Learning philosophy
+## Filosofia de aprendizado
 
-This repository favors understandable engineering decisions over unnecessary complexity. Features are added when they create a concrete learning objective or developer use case.
+Este repositório prioriza decisões de engenharia compreensíveis em vez de complexidade desnecessária. Funcionalidades são adicionadas quando criam um objetivo concreto de aprendizado ou um caso de uso real para desenvolvimento.
 
-The aim is to be able to explain not only **what the code does**, but also **why it was designed this way, what can go wrong, what trade-offs were accepted, and what would need to change before production use**.
+O objetivo é conseguir explicar não apenas **o que o código faz**, mas também **por que ele foi projetado dessa forma, o que pode dar errado, quais trade-offs foram aceitos e o que precisaria mudar antes de um uso em produção**.
 
-## License
+## Licença
 
-MIT — see [`LICENSE`](LICENSE).
+MIT — consulte [`LICENSE`](LICENSE).
