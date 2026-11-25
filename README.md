@@ -4,6 +4,12 @@ Um servidor **Model Context Protocol (MCP)** desenvolvido em Python, com foco em
 
 Este projeto está sendo desenvolvido deliberadamente como uma **parte prática de estudo em Engenharia de Software, IA aplicada e MCP**. O objetivo não é apenas criar um servidor MCP funcional, mas também documentar como o protocolo funciona, por que determinadas decisões arquiteturais foram tomadas, quais limites de segurança são necessários quando um LLM pode solicitar a execução de ferramentas e como a implementação pode evoluir de um servidor local pequeno para uma arquitetura mais observável e próxima de um cenário de produção.
 
+## Faça a primeira chamada
+
+O [guia do primeiro cliente MCP](docs/first-tool.md) mostra como iniciar o servidor
+a partir de um cliente Python, chamar `read_file` em um arquivo de exemplo e
+conferir a resposta. Depois, siga os links do cliente até a ferramenta no código.
+
 ## Por que este projeto existe?
 
 Ler sobre MCP ajuda a entender o protocolo. Implementar um servidor MCP, porém, expõe problemas reais de engenharia: contratos de ferramentas, fronteiras de confiança, acesso ao sistema de arquivos, execução de subprocessos, validação de entrada, escolha de transporte, testes, empacotamento e observabilidade.
@@ -27,8 +33,8 @@ Este projeto utiliza o SDK MCP para Python e a API de servidor `FastMCP`.
 | --- | --- | --- |
 | `health_check` | Informa o estado básico do serviço | Não expõe detalhes desnecessários do host |
 | `list_repo_files` | Lista arquivos e diretórios | Restrito ao workspace configurado |
-| `read_file` | Lê arquivos de texto/código em UTF-8 | Limite de tamanho + bloqueio de credenciais |
-| `search_code` | Busca literal case-insensitive no código | Quantidade de resultados limitada + confinamento ao workspace |
+| `read_file` | Lê arquivos de texto/código em UTF-8 | Limite de tamanho e bloqueio de nomes e extensões associados a credenciais |
+| `search_code` | Busca literal no código, ignorando maiúsculas e minúsculas | Limite de resultados e escopo inicial no workspace configurado |
 | `git_status` | Consulta o estado da working tree do Git | Comando Git fixo e somente leitura |
 | `git_log` | Consulta um histórico compacto de commits | Comando fixo + histórico limitado |
 
@@ -62,7 +68,7 @@ A implementação foi separada em responsabilidades explícitas, em vez de conce
 - **Docker** fornece uma forma reproduzível de execução e utiliza usuário não-root.
 - **GitHub Actions** executa lint e testes nas versões de Python suportadas.
 
-Uma decisão importante foi tratar os argumentos recebidos pelas tools como **entrada não confiável**. O fato de um argumento ter sido produzido por um LLM não o torna seguro. Por exemplo, `read_file("../../.ssh/id_rsa")` deve ser bloqueado pelo próprio servidor, sem depender do modelo para evitar esse tipo de solicitação.
+As ferramentas tratam seus argumentos como **entrada não confiável**. Em `read_file`, o servidor confere se o caminho resolvido está dentro do workspace e aplica as regras de tamanho, nomes e extensões antes da leitura.
 
 Na integração com Git, o servidor não disponibiliza um executor genérico de comandos. Ele monta uma lista fixa de argumentos do `git` e executa o processo sem interpolação via shell. Dessa forma, a superfície de ataque da v0.1 permanece menor e as operações Git continuam somente leitura.
 
@@ -72,9 +78,8 @@ Este é um projeto de estudo e **não deve ser interpretado como um sistema já 
 
 Controles atuais:
 
-- confinamento ao diretório raiz do workspace;
-- prevenção de path traversal;
-- bloqueio de `.env`, chaves privadas e arquivos de certificado;
+- validação do caminho solicitado com base no diretório raiz do workspace;
+- bloqueio por nome ou extensão em `read_file` para arquivos como `.env` e `.pem`;
 - limite máximo para leitura de arquivos;
 - limites para resultados de busca e histórico Git;
 - ausência de execução arbitrária de shell;
@@ -91,7 +96,8 @@ Essas decisões servem como exemplos práticos de **princípio do menor privilé
 developer-toolbox-mcp/
 ├── .github/workflows/ci.yml
 ├── docs/
-│   └── architecture.md
+│   ├── architecture.md
+│   └── first-tool.md
 ├── src/developer_toolbox_mcp/
 │   ├── __init__.py
 │   ├── config.py
@@ -120,8 +126,6 @@ developer-toolbox-mcp/
 git clone https://github.com/ErikaMendes89/developer-toolbox-mcp.git
 cd developer-toolbox-mcp
 ```
-
-Enquanto a implementação ainda não estiver na `main`, faça checkout da branch apresentada no Pull Request.
 
 ### 2. Criar um ambiente virtual
 
@@ -158,7 +162,7 @@ A configuração principal é:
 TOOLBOX_WORKSPACE_ROOT=.
 ```
 
-Somente arquivos abaixo desse diretório podem ser acessados pelas tools de filesystem. Para experimentar em outro repositório, aponte essa variável especificamente para ele em vez de liberar todo o seu diretório pessoal.
+A variável define o diretório a partir do qual o servidor resolve os caminhos solicitados. Para o primeiro teste, use o diretório de exemplo do [guia](docs/first-tool.md).
 
 ### 5. Executar testes e lint
 
